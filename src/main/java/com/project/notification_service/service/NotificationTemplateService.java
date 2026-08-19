@@ -105,7 +105,8 @@ public class NotificationTemplateService {
     }
 
     public List<NotificationTemplate> getTemplates(Channel channel, EventType eventType) {
-        Specification<NotificationTemplate> spec = Specification.where((Specification<NotificationTemplate>) null);
+        Specification<NotificationTemplate> spec = Specification.where(
+                (root, query, criteriaBuilder) -> criteriaBuilder.conjunction());
         if (channel != null) {
             spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("channel"), channel));
         }

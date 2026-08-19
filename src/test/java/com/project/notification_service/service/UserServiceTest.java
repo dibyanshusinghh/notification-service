@@ -1,7 +1,9 @@
 package com.project.notification_service.service;
 
 import com.project.notification_service.dto.request.UserAuthRequest;
+import com.project.notification_service.dto.request.UserLoginRequest;
 import com.project.notification_service.dto.response.UserAuthResponse;
+import com.project.notification_service.exception.DuplicateResourceException;
 import com.project.notification_service.model.User;
 import com.project.notification_service.model.enums.Role;
 import com.project.notification_service.repository.UserRepository;
@@ -12,10 +14,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -43,13 +52,13 @@ public class UserServiceTest {
                 .passwordHash("hashedpassword")
                 .build();
 
-        Mockito.when(userRepository.existsByEmail(userRequest.getEmail()))
+        when(userRepository.existsByEmail(userRequest.getEmail()))
                 .thenReturn(false);
-        Mockito.when(passwordEncoder.encode(userRequest.getPassword()))
+        when(passwordEncoder.encode(userRequest.getPassword()))
                 .thenReturn("encodedPassword");
-        Mockito.when(userRepository.save(Mockito.any(User.class)))
+        when(userRepository.save(any(User.class)))
                 .thenReturn(savedUser);
-        Mockito.when(jwtTokenProvider.generateToken(Mockito.any(UserPrincipal.class)))
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class)))
                 .thenReturn("jwt-token");
 
         // Act
@@ -63,9 +72,63 @@ public class UserServiceTest {
         Assertions.assertEquals("ROLE_CLIENT", response.getRole());
         Assertions.assertEquals("jwt-token", response.getToken());
 
-        Mockito.verify(userRepository).existsByEmail(userRequest.getEmail());
-        Mockito.verify(passwordEncoder).encode(userRequest.getPassword());
-        Mockito.verify(userRepository).save(Mockito.any(User.class));
-        Mockito.verify(jwtTokenProvider).generateToken(Mockito.any(UserPrincipal.class));
+        verify(userRepository).existsByEmail(userRequest.getEmail());
+        verify(passwordEncoder).encode(userRequest.getPassword());
+        verify(userRepository).save(any(User.class));
+        verify(jwtTokenProvider).generateToken(any(UserPrincipal.class));
+    }
+
+    @Test
+    public void registerUser_EmailAlreadyExists() {
+        // Arrange
+        UserAuthRequest userRequest = new UserAuthRequest("testuser", "testuser@gmail.com", Role.CLIENT, "testpassword");
+
+        when(userRepository.existsByEmail(userRequest.getEmail()))
+                .thenReturn(true);
+
+        // Act & Assert
+        Assertions.assertThrows(DuplicateResourceException.class,
+                () -> userService.createUser(userRequest));
+
+        verify(userRepository).existsByEmail(userRequest.getEmail());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    public void loginUser_Success() {
+        // Arrange
+        UserLoginRequest loginRequest = new UserLoginRequest("testuser", "testpassword");
+
+        User user = User.builder()
+                .id(1L)
+                .username("testuser")
+                .email("testuser@gmail.com")
+                .role(Role.CLIENT)
+                .passwordHash("hashedpassword")
+                .build();
+        UserPrincipal userPrincipal = UserPrincipal.create(user);
+
+        Authentication authentication = mock(Authentication.class);
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(authentication.getPrincipal())
+                .thenReturn(userPrincipal);
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class)))
+                .thenReturn("jwt-token");
+
+        // Act
+        UserAuthResponse response = userService.loginUser(loginRequest);
+
+        // Assert
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(1L, response.getUserId());
+        Assertions.assertEquals("testuser", response.getUsername());
+        Assertions.assertEquals("testuser@gmail.com", response.getEmail());
+        Assertions.assertEquals("ROLE_CLIENT", response.getRole());
+        Assertions.assertEquals("jwt-token", response.getToken());
+
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(jwtTokenProvider).generateToken(any(UserPrincipal.class));
     }
 }
