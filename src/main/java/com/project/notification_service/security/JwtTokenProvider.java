@@ -1,6 +1,5 @@
 package com.project.notification_service.security;
 
-import com.project.notification_service.model.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;

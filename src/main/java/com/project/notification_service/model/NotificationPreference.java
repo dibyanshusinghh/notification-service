@@ -8,10 +8,13 @@ import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString(exclude = "user")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "notification_preferences",
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "channel", "event_type"}))
@@ -19,10 +22,9 @@ public class NotificationPreference {
 
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @EqualsAndHashCode.Exclude
-    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
